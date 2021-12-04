@@ -3,7 +3,8 @@ library(rpart.plot)
 library(randomForest)
 library(pdp)           # for partial dependence plots, includes dataset boston
 
-
+#===============================================================================
+# dataset -- BostonHousing
 library(mlbench)
 data(BostonHousing)
 
@@ -15,7 +16,7 @@ X = BostonHousing[,-14]
 X.nrows = dim(X)[1]
 X.ncols = dim(X)[2]
 
-rangeContinuous(X)
+dataRange(X)
 
 # f(X) is random forest
 boston_rf <- randomForest(medv ~ ., data = BostonHousing, importance = TRUE)
@@ -26,6 +27,51 @@ pdp.colored
 
 
 # tree fitted with the real data
-temp <- rpart.control(xval=10, minbucket=2, minsplit=4,  cp=0, maxdepth = 4)
-boston_tree <- rpart(medv ~ ., data = BostonHousing, method = "anova", control = temp)
+temp <- rpart.control(xval=10, minbucket=2, minsplit=4,  cp=0, maxdepth = 6)
+boston_tree <- rpart(medv ~ nox+chas, data = BostonHousing, method = "anova", control = temp)
 rpart.plot(boston_tree)
+#treeInfo(boston_tree)->info
+getRids(96)
+samplingRange(96,boston_tree,X)
+dataRange(X)
+
+
+#===============================================================================
+# dataset -- iris
+library(datasets)
+head(iris)
+X=iris[,-4]
+dataRange(X)
+temp <- rpart.control(xval=10, minbucket=2, minsplit=4,  cp=0, maxdepth = 10)
+tree_iris <- rpart(Petal.Width ~ Species+Petal.Length, data = iris, method = "anova", control = temp)
+rpart.plot(tree_iris)
+samplingRange(100,tree_iris,X)
+
+
+#===============================================================================
+# dataset -- mtcars
+head(mtcars)
+mtcars2 <- within(mtcars, {
+  vs <- factor(vs, labels = c("V", "S"))
+  am <- factor(am, labels = c("automatic", "manual"))
+  cyl  <- ordered(cyl)
+  gear <- ordered(gear)
+  carb <- ordered(carb)
+})
+summary(mtcars2)
+str(mtcars2)
+
+X=mtcars2[,-1]
+dataRange(X)
+temp <- rpart.control(xval=10, minbucket=2, minsplit=4,  cp=0, maxdepth = 10)
+tree_car <- rpart(mpg ~ ., data = mtcars2, method = "anova", control = temp)
+rpart.plot(tree_car)
+getRids(77)
+samplingRange(77,tree_car,X)
+
+
+
+
+
+
+
