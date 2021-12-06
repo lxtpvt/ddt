@@ -12,6 +12,7 @@ head(BostonHousing)
 str(BostonHousing)
 
 X = BostonHousing[,-14]
+X = BostonHousing[,-c(4,14)]
 
 X.nrows = dim(X)[1]
 X.ncols = dim(X)[2]
@@ -75,11 +76,20 @@ minlength=0L
 getRids(id)
 dataRange(X)
 rangeConditions(id,tree_car,digits = digits, minlength = minlength)
-samplingRange(id,tree_car,X,digits = digits, minlength = minlength)
+samplingRegion(id,tree_car,X,digits = digits, minlength = minlength)
 
+# try pcaSampling
 
+X.continuous = mtcars2[,3:7]
+(dataRange(X.continuous))$numeric -> spR
 
+pcaSampling(X.continuous,2,10000,spR)->pcaS
 
+car_rf <- randomForest(mpg ~ ., data = mtcars2, importance = TRUE)
+pd <- partial(car_rf, pred.var = c("wt", "cyl"))
+rwb <- colorRampPalette(c("blue", "white", "red"))
+pdp.colored <- plotPartial(pd, contour = TRUE, col.regions = rwb)
+pdp.colored
 
 
 

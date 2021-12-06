@@ -106,7 +106,7 @@ rangeConditions <- function(id,tree,digits = 5, minlength = 0L){
   return(list(numeric = df_numeric, factor = df_factor))
 }
 
-samplingRange <- function(id,tree,X,digits = 5, minlength = 0L){
+samplingRegion <- function(id,tree,X,digits = 5, minlength = 0L){
 
   X_range = dataRange(X)
   df_conditions = rangeConditions(id,tree,digits = digits, minlength = minlength)
