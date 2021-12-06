@@ -1,5 +1,5 @@
 
-
+# Sampling Range
 
 
 getRids <- function(id){
@@ -146,6 +146,4 @@ samplingRange <- function(id,tree,X,digits = 5, minlength = 0L){
   return(X_range)
 }
 
-
-#samplingRange
 
