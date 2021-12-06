@@ -51,20 +51,19 @@ dataRange <- function(X){
   return(list(numeric=numeric,factor=factor))
 }
 
-treeInfo <- function(tree,digits = 5, minlength = 0L){
+treeInfo <- function(tree, digits = 5, minlength = 0L){
   frame=tree$frame
   frame$nid = as.numeric(row.names(tree$frame))
   frame$conditions<-labels(tree, digits = digits, minlength = minlength)
   frame
 }
 
-samplingRange <- function(id,tree,X,digits = 5, minlength = 0L){
+rangeConditions <- function(id,tree,digits = 5, minlength = 0L){
   df_numeric <- data.frame(var=character(), sign=character(), split=double(),
                            stringsAsFactors=FALSE)
   df_factor <- data.frame(var=character(), sign=character(), split=character(),
                           stringsAsFactors=FALSE)
-  X_range = dataRange(X)
-  treeInfo(tree)->t_info
+  treeInfo(tree, digits = digits, minlength = minlength)->t_info
   t_info[t_info$nid%in%getRids(id),"conditions"] -> strConditions
   signs1 = c(">=","<=","!=")
   signs2 = c("<","=",">")
@@ -104,7 +103,15 @@ samplingRange <- function(id,tree,X,digits = 5, minlength = 0L){
       }
     }
   }
+  return(list(numeric = df_numeric, factor = df_factor))
+}
 
+samplingRange <- function(id,tree,X,digits = 5, minlength = 0L){
+
+  X_range = dataRange(X)
+  df_conditions = rangeConditions(id,tree,digits = digits, minlength = minlength)
+  df_numeric = df_conditions$numeric
+  df_factor = df_conditions$factor
   # categorical variables
   if(dim(df_factor)[1]!=0){
     for (i in 1:dim(df_factor)[1]) {
@@ -136,8 +143,7 @@ samplingRange <- function(id,tree,X,digits = 5, minlength = 0L){
     }
   }
 
-  df_conditions<-list(numeric = df_numeric, factor = df_factor)
-  return(list(samplingR = X_range,df_conditions=df_conditions))
+  return(X_range)
 }
 
 

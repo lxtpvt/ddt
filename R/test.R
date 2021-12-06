@@ -43,7 +43,8 @@ head(iris)
 X=iris[,-4]
 dataRange(X)
 temp <- rpart.control(xval=10, minbucket=2, minsplit=4,  cp=0, maxdepth = 10)
-tree_iris <- rpart(Petal.Width ~ Species+Petal.Length, data = iris, method = "anova", control = temp)
+tree_iris <- rpart(Petal.Width ~ Species+Petal.Length, data = iris,
+                   method = "anova", control = temp)
 rpart.plot(tree_iris)
 samplingRange(100,tree_iris,X)
 
@@ -61,13 +62,22 @@ mtcars2 <- within(mtcars, {
 summary(mtcars2)
 str(mtcars2)
 
-X=mtcars2[,-1]
-dataRange(X)
+
 temp <- rpart.control(xval=10, minbucket=2, minsplit=4,  cp=0, maxdepth = 10)
 tree_car <- rpart(mpg ~ ., data = mtcars2, method = "anova", control = temp)
 rpart.plot(tree_car)
-getRids(77)
-samplingRange(77,tree_car,X)
+
+X=mtcars2[,-1]
+id = 77
+digits=5
+minlength=0L
+
+getRids(id)
+dataRange(X)
+rangeConditions(id,tree_car,digits = digits, minlength = minlength)
+samplingRange(id,tree_car,X,digits = digits, minlength = minlength)
+
+
 
 
 
