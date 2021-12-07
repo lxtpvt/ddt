@@ -75,8 +75,8 @@ samplingRegion(100,tree_iris,X)
 #
 # getRids(id)
 # dataRange(X)
-# t_info<-treeInfo(tree_car)
-# rangeConditions(id,t_info)
+# info<-treeInfo(tree_car)
+# rangeConditions(id,info)
 # samplingRegion(id,tree_car,X,digits = digits, minlength = minlength)
 #
 # # try pcaSampling
