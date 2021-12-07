@@ -2,16 +2,6 @@
 # Sampling Range
 
 
-getRids <- function(id){
-  rids=id
-  temp = id
-  while (temp!=1) {
-    rids=c(rids,floor(temp/2))
-    temp=floor(temp/2)
-  }
-  rids
-}
-
 dataRange <- function(X){
 
   if(!is.data.frame(X)){
@@ -48,14 +38,7 @@ dataRange <- function(X){
       factor = sapply(X.categorical, levels)
     }
   }
-  return(list(numeric=numeric,factor=factor))
-}
-
-treeInfo <- function(tree, digits = 5, minlength = 0L){
-  frame=tree$frame
-  frame$nid = as.numeric(row.names(tree$frame))
-  frame$conditions<-labels(tree, digits = digits, minlength = minlength)
-  frame
+  return(list(names=colnames(X),numeric=numeric,factor=factor))
 }
 
 rangeConditions <- function(id,treeInfo){
