@@ -59,25 +59,27 @@ treeInfo <- function(tree, digits = 5, minlength = 0L){
 }
 
 rangeConditions <- function(id,treeInfo){
-  df_numeric <- data.frame(var=character(), sign=character(), split=double(),
+  df_numeric <- data.frame(nid=integer(), var=character(), sign=character(), split=double(),
                            stringsAsFactors=FALSE)
-  df_factor <- data.frame(var=character(), sign=character(), split=character(),
+  df_factor <- data.frame(nid=integer(), var=character(), sign=character(), split=character(),
                           stringsAsFactors=FALSE)
-  treeInfo[treeInfo$nid %in% getRids(id),"conditions"] -> strConditions
+  treeInfo[treeInfo$nid %in% getRids(id),c("nid","conditions")] -> conditions
   signs1 = c(">=","<=","!=")
   signs2 = c("<","=",">")
-  for (i in 1:length(strConditions)) {
+  for (i in 1:dim(conditions)[1]) {
     flag_signs1 = FALSE
     for (j_1 in 1:length(signs1)) {
-      if(grepl(signs1[j_1],strConditions[i],fixed = T)){
-        strsplit(strConditions[i],signs1[j_1])[[1]] -> temp_v
+      if(grepl(signs1[j_1],conditions[i,"conditions"],fixed = T)){
+        strsplit(conditions[i,"conditions"],signs1[j_1])[[1]] -> temp_v
         if(signs1[j_1]!="!="){
           df_numeric = rbind(df_numeric,
-                             data.frame(var=trimws(temp_v[1]),sign=signs1[j_1],
+                             data.frame(nid=as.integer(conditions[i,"nid"]),
+                                        var=trimws(temp_v[1]),sign=signs1[j_1],
                                         split=as.numeric(trimws(temp_v[2]))))
         }else{
           df_factor = rbind(df_factor,
-                            data.frame(var=trimws(temp_v[1]),sign=signs1[j_1],
+                            data.frame(nid=as.integer(conditions[i,"nid"]),
+                                       var=trimws(temp_v[1]),sign=signs1[j_1],
                                        split=trimws(temp_v[2])))
         }
         flag_signs1=TRUE
@@ -86,15 +88,17 @@ rangeConditions <- function(id,treeInfo){
     }
     if(!flag_signs1){
       for (j_2 in 1:length(signs2)) {
-        if(grepl(signs2[j_2],strConditions[i],fixed = T)){
-          strsplit(strConditions[i],signs2[j_2])[[1]] -> temp_v
+        if(grepl(signs2[j_2],conditions[i,"conditions"],fixed = T)){
+          strsplit(conditions[i,"conditions"],signs2[j_2])[[1]] -> temp_v
           if(signs2[j_2]!="="){
             df_numeric = rbind(df_numeric,
-                               data.frame(var=trimws(temp_v[1]),sign=signs2[j_2],
+                               data.frame(nid=as.integer(conditions[i,"nid"]),
+                                          var=trimws(temp_v[1]),sign=signs2[j_2],
                                           split=as.numeric(trimws(temp_v[2]))))
           }else{
             df_factor = rbind(df_factor,
-                              data.frame(var=trimws(temp_v[1]),sign=signs2[j_2],
+                              data.frame(nid=as.integer(conditions[i,"nid"]),
+                                         var=trimws(temp_v[1]),sign=signs2[j_2],
                                          split=trimws(temp_v[2])))
           }
           break
@@ -105,11 +109,9 @@ rangeConditions <- function(id,treeInfo){
   return(list(numeric = df_numeric, factor = df_factor))
 }
 
-samplingRegion <- function(id,tree,X,digits = 5, minlength = 0L){
+samplingRegion <- function(id,X_range,treeInfo){
 
-  X_range = dataRange(X)
-  tree_info <- treeInfo(tree, digits = digits, minlength = minlength)
-  df_conditions = rangeConditions(id,tree_info)
+  df_conditions = rangeConditions(id,treeInfo)
   df_numeric = df_conditions$numeric
   df_factor = df_conditions$factor
   # categorical variables

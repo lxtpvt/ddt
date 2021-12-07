@@ -1,5 +1,6 @@
 # PCA sampling
 
+# samplingRegion: a matrix for the hypercube support of continuous covariates
 pcaSampling <- function(X, samplingDim, n, samplingRegion) {
 
   p = dim(X)[2]
@@ -9,7 +10,7 @@ pcaSampling <- function(X, samplingDim, n, samplingRegion) {
 
   size_v = rep(1,p)
   (res.pca$sdev^2)[1:samplingDim]/(res.pca$sdev^2)[samplingDim]->tm
-  size_v[1:samplingDim] = round(tm*((sampleSize/prod(tm))^(1/samplingDim)),0)
+  size_v[1:samplingDim] = round(tm*((n/prod(tm))^(1/samplingDim)),0)
 
   #prod(size_v)
 

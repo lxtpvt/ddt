@@ -33,8 +33,9 @@ boston_tree <- rpart(medv ~ nox+chas, data = BostonHousing, method = "anova", co
 rpart.plot(boston_tree)
 #treeInfo(boston_tree)->info
 getRids(96)
-samplingRegion(96,boston_tree,X)
-dataRange(X)
+treeInfo(boston_tree)
+samplingRegion(96,dataRange(X),treeInfo(boston_tree))
+
 
 
 #===============================================================================
@@ -47,12 +48,13 @@ temp <- rpart.control(xval=10, minbucket=2, minsplit=4,  cp=0, maxdepth = 10)
 tree_iris <- rpart(Petal.Width ~ Species+Petal.Length, data = iris,
                    method = "anova", control = temp)
 rpart.plot(tree_iris)
-samplingRegion(100,tree_iris,X)
+treeInfo(tree_iris)
+samplingRegion(100,dataRange(X),treeInfo(tree_iris))
 
 
 #===============================================================================
 # dataset -- mtcars
-# head(mtcars)
+head(mtcars)
 mtcars2 <- within(mtcars, {
   vs <- factor(vs, labels = c("V", "S"))
   am <- factor(am, labels = c("automatic", "manual"))
@@ -62,7 +64,6 @@ mtcars2 <- within(mtcars, {
 })
 summary(mtcars2)
 str(mtcars2)
-
 
 temp <- rpart.control(xval=10, minbucket=2, minsplit=4,  cp=0, maxdepth = 10)
 tree_car <- rpart(mpg ~ ., data = mtcars2, method = "anova", control = temp)
@@ -75,12 +76,12 @@ minlength=0L
 
 getRids(id)
 dataRange(X)
-t_info<-treeInfo(tree_car)
-rangeConditions(id,t_info)
-samplingRegion(id,tree_car,X,digits = digits, minlength = minlength)
+treeInfo(tree_car)
+rangeConditions(id,treeInfo(tree_car))
+samplingRegion(id,dataRange(X),treeInfo(tree_car))
 
+#=====================
 # try pcaSampling
-
 X.continuous = mtcars2[,3:7]
 (dataRange(X.continuous))$numeric -> spR
 
@@ -91,6 +92,13 @@ pd <- partial(car_rf, pred.var = c("wt", "cyl"))
 rwb <- colorRampPalette(c("blue", "white", "red"))
 pdp.colored <- plotPartial(pd, contour = TRUE, col.regions = rwb)
 pdp.colored
+
+#=====================
+# try tree stability
+
+splitTable(treeInfo(tree_car))
+
+
 
 
 
