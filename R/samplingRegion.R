@@ -58,13 +58,12 @@ treeInfo <- function(tree, digits = 5, minlength = 0L){
   frame
 }
 
-rangeConditions <- function(id,tree,digits = 5, minlength = 0L){
+rangeConditions <- function(id,treeInfo){
   df_numeric <- data.frame(var=character(), sign=character(), split=double(),
                            stringsAsFactors=FALSE)
   df_factor <- data.frame(var=character(), sign=character(), split=character(),
                           stringsAsFactors=FALSE)
-  treeInfo(tree, digits = digits, minlength = minlength)->t_info
-  t_info[t_info$nid%in%getRids(id),"conditions"] -> strConditions
+  treeInfo[treeInfo$nid %in% getRids(id),"conditions"] -> strConditions
   signs1 = c(">=","<=","!=")
   signs2 = c("<","=",">")
   for (i in 1:length(strConditions)) {
@@ -109,11 +108,12 @@ rangeConditions <- function(id,tree,digits = 5, minlength = 0L){
 samplingRegion <- function(id,tree,X,digits = 5, minlength = 0L){
 
   X_range = dataRange(X)
-  df_conditions = rangeConditions(id,tree,digits = digits, minlength = minlength)
+  tree_info <- treeInfo(tree, digits = digits, minlength = minlength)
+  df_conditions = rangeConditions(id,tree_info)
   df_numeric = df_conditions$numeric
   df_factor = df_conditions$factor
   # categorical variables
-  if(dim(df_factor)[1]!=0){
+  if(dim(df_factor)[1]>0 && length(X_range$factor)>0){
     for (i in 1:dim(df_factor)[1]) {
       for (j in 1:length(X_range$factor)) {
         if(df_factor$var[i]==names(X_range$factor)[j]){
@@ -125,7 +125,7 @@ samplingRegion <- function(id,tree,X,digits = 5, minlength = 0L){
   }
 
   # continuous variables
-  if(dim(df_numeric)[1]!=0){
+  if(dim(df_numeric)[1]>0 && dim(X_range$numeric)[1]>0){
     for (i in 1:dim(df_numeric)[1]) {
       for (j in 1:dim(X_range$numeric)[2]) {
         if(df_numeric$var[i]==colnames(X_range$numeric)[j]){
