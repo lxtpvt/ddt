@@ -1,13 +1,173 @@
 
-setSamplingStrategy <- function(method, samplingRegion, para){
 
-  return(list(method = method, samplingRegion = samplingRegion, para = para))
-
+setSamplingParameters <- function(null=TRUE, X, percentageVariance, nRandomSampling=dim(X)[1]){
+  if(null){
+    return(NULL)
+  }else{
+    return(list(X = X, nRandomSampling = nRandomSampling, percentageVariance = percentageVariance))
+  }
 }
 
+setSamplingStrategy <- function(samplingMethod, samplingRegion, samplingParameters){
+  return(list(samplingMethod = samplingMethod, samplingRegion = samplingRegion,
+              samplingParameters = samplingParameters))
+}
+
+#===============================================================================
+# uniform random sampling
+randomSampling <- function(samplingRegion, samplingParameters=NULL, n){
+
+  X_sampled <- data.frame(matrix(NA,    # Create empty data frame
+                                 nrow = n,
+                                 ncol = length(samplingRegion$data_range$names)))
+  colnames(X_sampled) <- samplingRegion$data_range$names
+
+
+  n.factor = length(samplingRegion$id_range$factor)
+  n.numeric = dim(samplingRegion$id_range$numeric)[2]
+
+  if(n.factor>0){
+    for (i in 1:n.factor) {
+      sample(samplingRegion$id_range$factor[[i]], n, replace = TRUE) ->
+        X_sampled[,which(colnames(X_sampled) == names(samplingRegion$id_range$factor)[i])]
+    }
+  }
+  if(!is.null(n.numeric)){
+    for (i in 1:n.numeric) {
+      runif(n,min = samplingRegion$id_range$numeric[1,i],max = samplingRegion$id_range$numeric[2,i]) ->
+        X_sampled[,which(colnames(X_sampled) == colnames(samplingRegion$id_range$numeric)[i])]
+    }
+  }
+  # factor()
+  for (i in 1:length(samplingRegion$data_range$names)) {
+    if(colnames(X_sampled)[i] %in% names(samplingRegion$data_range$factor)){
+      X_sampled[,i] = factor(X_sampled[,i],levels = samplingRegion$data_range$factor[[colnames(X_sampled)[i]]])
+    }
+  }
+  return(X_sampled)
+}
+
+#===============================================================================
 # PCA sampling
+
+# samplingRegionNumeric: a matrix for the hypercube support of continuous covariates
+pcaSamplingContinuous <- function(X, percentageVariance , samplingRegionNumeric) {
+
+  p = dim(X)[2]
+  res.pca <- prcomp(X,scale=TRUE)
+  X.pca = res.pca$x
+  pcaRegion = (dataRange(as.data.frame(X.pca)))$numeric
+
+  # ratio of sample size
+  for (i in 1:p) {
+    if((percentageVariance-sum((res.pca$sdev^2/sum(res.pca$sdev^2))[1:i]))<=0){
+      cfInd = i
+    }
+  }
+  ceiling(res.pca$sdev^2/(res.pca$sdev^2)[cfInd]) -> size_v
+  if(0 %in% size_v){
+    return("In X, observations' number n is less than covariates number p.")
+  }
+
+  # sampling in the pca region
+  temp_s = list()
+  for (i in 1:p) {
+    temp_s[[i]] <- runif(size_v[i],min = pcaRegion[1,i], pcaRegion[2,i])
+  }
+  #
+  if(cfInd>2){
+    for (i in 2:(cfInd-1)) {
+      temp_s[[i]] <- sample(temp_s[[i]],size_v[1],replace = TRUE)
+    }
+  }
+  for (i in cfInd:p) {
+    temp_s[[i]] <- rep(temp_s[[i]],size_v[1])
+  }
+
+  # construct the matrix
+  pcaSample = matrix(nrow = size_v[1],ncol = 0)
+  for (i in 1:p) {
+    pcaSample = cbind(pcaSample,temp_s[[i]])
+  }
+
+  # pca transform
+  X_temp = pcaSample%*%t(res.pca$rotation)
+  X_sampled = t(t(X_temp) * res.pca$scale + res.pca$center)
+
+  good_flag = rep(TRUE,size_v[1])
+  for (j in 1:p) {
+    good_flag = good_flag & (X_sampled[, j] >= samplingRegionNumeric[1,j] &
+                               X_sampled[, j] <= samplingRegionNumeric[2,j])
+  }
+  X_sampled = X_sampled[good_flag,]
+  return(as.data.frame(X_sampled))
+}
+
+
+# pca sampling include both categorical and numerical covariates
+pcaSamplingSizeOne <- function(X, samplingRegion, percentageVariance){
+  # if numerical covariates do exist
+  # first, do pca sampling
+  X.continuous = X[,colnames(samplingRegion$data_range$numeric)]
+  # do pca sampling
+  pca_sampled = pcaSamplingContinuous(X.continuous,
+                                      percentageVariance, samplingRegion$id_range$numeric)
+  n_good_numeric_sampled = dim(pca_sampled)[1]
+
+  n.factor = length(samplingRegion$data_range$factor)
+  # if there are some categorical covariates, draw them and combined them with numeric covariates
+  if(n.factor>0){
+    for (i in 1:n.factor) {
+      pca_sampled <- cbind(pca_sampled,
+                           rep(sample(samplingRegion$id_range$factor[[i]], 1, replace = TRUE),
+                               n_good_numeric_sampled))
+    }
+  }
+  colnames(pca_sampled)<-c(colnames(samplingRegion$data_range$numeric),names(samplingRegion$data_range$factor))
+  return(pca_sampled)
+}
+
+# marginal random sampling based on pca random sampling
+marginalRandomSampling <- function(samplingRegion, samplingParameters, n){
+
+  if(is.null(samplingParameters)){
+    return("Please set sampling parameters")
+  }
+  # first random sampling
+  if(is.null(samplingParameters$X)){
+    X = randomSampling(samplingRegion, samplingParameters=NULL, samplingParameters$nRandomSampling)
+  }else{
+    X = samplingParameters$X
+  }
+
+  n.numeric = dim(samplingRegion$data_range$numeric)[2]
+  # if numerical covariates don't exist
+  if(is.null(n.numeric)){
+    # if there are only categorical covariates, do random sampling only in categorical ones.
+    return(randomSampling(samplingRegion, samplingParameters=NULL, n))
+  }else{
+    pca_sampled = pcaSamplingSizeOne(X, samplingRegion, samplingParameters$percentageVariance)
+    sz = dim(pca_sampled)[1]
+    while (sz<n) {
+      pca_sampled = rbind(pca_sampled, pcaSamplingSizeOne(X, samplingRegion,
+                                                          samplingParameters$percentageVariance))
+      sz = dim(pca_sampled)[1]
+    }
+    # factor()
+    for (i in 1:length(samplingRegion$data_range$names)) {
+      if(colnames(pca_sampled)[i] %in% names(samplingRegion$data_range$factor)){
+        pca_sampled[,i] = factor(pca_sampled[,i],levels = samplingRegion$data_range$factor[[colnames(pca_sampled)[i]]])
+      }
+    }
+    return(pca_sampled)
+  }
+}
+
+
+#===============================================================================
+# This is a old version, never using.
 # samplingRegionNum: a matrix for the hypercube support of continuous covariates
-pcaSamplingContinuous <- function(X, samplingDim, n, samplingRegionNum) {
+pcaSamplingContinuousOld <- function(X, samplingDim, n, samplingRegionNum) {
 
   p = dim(X)[2]
   res.pca <- prcomp(X,scale=TRUE)
@@ -47,55 +207,10 @@ pcaSamplingContinuous <- function(X, samplingDim, n, samplingRegionNum) {
 
   good_flag = rep(TRUE,prod(size_v))
   for (j in 1:p) {
-    good_flag = good_flag & (X_sampled[, j] >= samplingRegionNum[1,j] & X_sampled[, j] <= samplingRegionNum[2,j])
+    good_flag = good_flag & (X_sampled[, j] >= samplingRegionNum[1,j] &
+                               X_sampled[, j] <= samplingRegionNum[2,j])
   }
   X_sampled = X_sampled[good_flag,]
-  return(X_sampled)
-}
-
-
-marginalRandomSampling <- function(samplingRegion, para, n){
-
-  X = para$X
-  samplingDim = para$samplingDim
-  dr = dataRange(as.data.frame(X))
-  n.factor = length(dr$factor)
-  n.numeric = dim(dr$numeric)[2]
-
-  if(is.null(dim(dr$numeric)[2])){
-
-    X.continuous = X[,colnames(dr$numeric)]
-    numeric_sampled = pcaSamplingContinuous(X.continuous, samplingDim, n, samplingRegionNum)
-
-  }else{
-
-  }
-
-}
-
-randomSampling <- function(samplingRegion, para=NULL, n){
-
-  X_sampled <- data.frame(matrix(NA,    # Create empty data frame
-                            nrow = n,
-                            ncol = length(samplingRegion$names)))
-  colnames(X_sampled) <- samplingRegion$names
-
-
-  n.factor = length(samplingRegion$factor)
-  n.numeric = dim(samplingRegion$numeric)[2]
-
-  if(n.factor>0){
-    for (i in 1:n.factor) {
-      factor(runifCategorical(n,samplingRegion$factor[[i]])) ->
-        X_sampled[,which(samplingRegion$names == names(samplingRegion$factor)[i])]
-    }
-  }
-  if(!is.null(n.numeric)){
-    for (i in 1:n.numeric) {
-      runif(n,min = samplingRegion$numeric[1,i],max = samplingRegion$numeric[2,i]) ->
-        X_sampled[,which(samplingRegion$names == colnames(samplingRegion$numeric)[i])]
-    }
-  }
   return(X_sampled)
 }
 

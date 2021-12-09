@@ -1,7 +1,13 @@
 
+setSamplingRegion <- function(X_range,treeInfo=NULL,id=NA){
+  if(is.na(id)){
+    return(list(data_range = X_range, id_range = X_range))
+  }else{
+    return(samplingRegion(id,X_range,treeInfo))
+  }
+}
+
 # Sampling Range
-
-
 dataRange <- function(X){
 
   if(!is.data.frame(X)){
@@ -94,6 +100,7 @@ rangeConditions <- function(id,treeInfo){
 
 samplingRegion <- function(id,X_range,treeInfo){
 
+  id_X_range = X_range
   df_conditions = rangeConditions(id,treeInfo)
   df_numeric = df_conditions$numeric
   df_factor = df_conditions$factor
@@ -103,7 +110,7 @@ samplingRegion <- function(id,X_range,treeInfo){
       for (j in 1:length(X_range$factor)) {
         if(df_factor$var[i]==names(X_range$factor)[j]){
           unlist(strsplit(df_factor$split[i], ","))->tp_i
-          X_range$factor[[j]] = intersect(X_range$factor[[j]], tp_i)
+          id_X_range$factor[[j]] = intersect(X_range$factor[[j]], tp_i)
         }
       }
     }
@@ -116,11 +123,11 @@ samplingRegion <- function(id,X_range,treeInfo){
         if(df_numeric$var[i]==colnames(X_range$numeric)[j]){
           if(df_numeric$sign[i] %in% c(">=",">")){
             if(X_range$numeric[1,j]<df_numeric$split[i]){
-              X_range$numeric[1,j]=df_numeric$split[i]
+              id_X_range$numeric[1,j]=df_numeric$split[i]
             }
           }else if(df_numeric$sign[i] %in% c("<=","<")){
             if(X_range$numeric[2,j]>df_numeric$split[i]){
-              X_range$numeric[2,j]=df_numeric$split[i]
+              id_X_range$numeric[2,j]=df_numeric$split[i]
             }
           }
         }
@@ -128,7 +135,7 @@ samplingRegion <- function(id,X_range,treeInfo){
     }
   }
 
-  return(X_range)
+  return(list(data_range = X_range, id_range = id_X_range))
 }
 
 

@@ -1,8 +1,5 @@
 
-setRpartPara <- function(method,control,predict_type){
-  return(list(method = method, control = control, predict_type = predict_type))
-}
-
+# sample() function  can instead of this function.
 # C is a vector
 runifCategorical <- function(n, C){
 
@@ -14,15 +11,3 @@ runifCategorical <- function(n, C){
   return(res)
 }
 
-
-criterionMse <- function(y, pred_y, type){
-
-
-
-}
-
-criterionMisclass <- function(y, pred_y, type){
-
-
-
-}
