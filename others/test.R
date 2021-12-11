@@ -2,7 +2,7 @@
 library(rpart.plot)
 library(randomForest)
 library(pdp)           # for partial dependence plots, includes dataset boston
-
+setwd("/home/lxt/GitHub/ddt/others")
 #===============================================================================
 # dataset -- BostonHousing
 library(mlbench)
@@ -83,11 +83,15 @@ mtcars2 <- within(mtcars, {
 })
 summary(mtcars2)
 str(mtcars2)
+X=mtcars2[,-1]
 
 temp <- rpart.control(xval=10, minbucket=2, minsplit=4,  cp=0, maxdepth = 10)
 tree_car <- rpart(mpg ~ ., data = mtcars2, method = "anova", control = temp)
+par(mfrow=c(1,1))
 rpart.plot(tree_car)
 
+subtree_car = snip.rpart(tree_car,toss = c(3,5,18,29))
+rpart.plot(subtree_car)
 #=====================
 # test tree functions
 splitTable(treeInfo(tree_car))
@@ -117,33 +121,6 @@ marginalRandomSampling(samplingRegion = sR, samplingParameters = para, n = 100)
 # try tree stability -- mtcars
 # Random forest
 
-mtcars_rf <- randomForest(mpg ~ ., data = mtcars2, importance = TRUE)
-X = mtcars2[,-1]
-sR = setSamplingRegion(dataRange(X))
-para = setSamplingParameters(F,X,0.7)
-
-stg = setSamplingStrategy(samplingMethod="marginalRandomSampling",
-                          samplingRegion=sR,samplingParameters=para)
-
-ctl <- rpart.control(xval=20, minbucket=5, minsplit=10,  cp=0, maxdepth = 10)
-rparas = setRpartPara(method = "anova", control=ctl, predict_type="vector")
-
-# stable sample size
-sampleSize_v=seq(0, 300, by = 10)[-1]*dim(X)[1]
-
-a = stableSampleSize(fitedModel = mtcars_rf, samplingStrategy=stg, rpartParas=rparas,
-                     sampleSize_v=sampleSize_v, criterion="criterionMse")
-plotStableSize(a)
-abline(h=0.3)
-
-# structure stability, 3000 looks ok
-nSim = 100
-simRes <- simStability(nSim = nSim, fitedModel = mtcars_rf,
-                       samplingStrategy = stg, sampleSize = 3000, rpartParas = rparas)
-
-node_list <- stabilityAnalyze(simRes)
-
-plotSplitStability(node_list,nid = 5, nTop = 3,c("disp","hp","drat","wt","qsec"))
 
 
 #=====================
@@ -156,6 +133,33 @@ printcp(tree_car)
 plotcp(tree_car)
 
 # find best cp
+
+
+#===============================================================================
+sR = setSamplingRegion(X_range = dataRange(X))
+pcaPara = setSamplingParameters(null = F, X=X, percentageVariance = 0.7)
+stgPca = setSamplingStrategy(samplingMethod="marginalRandomSampling",
+                             samplingRegion=sR,samplingParameters=pcaPara)
+n_X = dim(X)[1]
+samplingStrategies = list()
+sampleSize = list()
+n = 5
+for (i in 1:n) {
+  #samplingStrategies = append(samplingStrategies, list(stgPca))
+  sampleSize = append(sampleSize, list(i*100*n_X))
+}
+
+nSim=100
+mtcars_rf <- randomForest(mpg ~ ., data = mtcars2, importance = TRUE)
+ctl <- rpart.control(xval=10, minbucket=5, minsplit=10,  cp=0, maxdepth = 1)
+rpartParas = setRpartPara(method = "anova", control=ctl, predict_type="vector")
+
+stumpsRes = stumps(nSim, fitedModel=mtcars_rf, samplingStrategies, sampleSize, rpartParas)
+
+save(stumpsRes, file = "stumpsRes.RData")
+
+
+
 
 
 

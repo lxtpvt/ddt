@@ -1,5 +1,5 @@
 
-
+# if X=NULL set the follows
 setSamplingParameters <- function(null=TRUE, X, percentageVariance, nRandomSampling=dim(X)[1]){
   if(null){
     return(NULL)
@@ -62,6 +62,7 @@ pcaSamplingContinuous <- function(X, percentageVariance , samplingRegionNumeric)
   for (i in 1:p) {
     if((percentageVariance-sum((res.pca$sdev^2/sum(res.pca$sdev^2))[1:i]))<=0){
       cfInd = i
+      break
     }
   }
   ceiling(res.pca$sdev^2/(res.pca$sdev^2)[cfInd]) -> size_v
@@ -100,6 +101,10 @@ pcaSamplingContinuous <- function(X, percentageVariance , samplingRegionNumeric)
                                X_sampled[, j] <= samplingRegionNumeric[2,j])
   }
   X_sampled = X_sampled[good_flag,]
+
+  if(sum(good_flag)==1){
+    X_sampled = matrix(X_sampled,nrow = 1, ncol = length(X_sampled))
+  }
   return(as.data.frame(X_sampled))
 }
 
@@ -113,18 +118,24 @@ pcaSamplingSizeOne <- function(X, samplingRegion, percentageVariance){
   pca_sampled = pcaSamplingContinuous(X.continuous,
                                       percentageVariance, samplingRegion$id_range$numeric)
   n_good_numeric_sampled = dim(pca_sampled)[1]
-
-  n.factor = length(samplingRegion$data_range$factor)
-  # if there are some categorical covariates, draw them and combined them with numeric covariates
-  if(n.factor>0){
-    for (i in 1:n.factor) {
-      pca_sampled <- cbind(pca_sampled,
-                           rep(sample(samplingRegion$id_range$factor[[i]], 1, replace = TRUE),
-                               n_good_numeric_sampled))
+  # if pcaSamplingContinuous' return is not null
+  if(n_good_numeric_sampled>0){
+    n.factor = length(samplingRegion$data_range$factor)
+    # if there are some categorical covariates, draw them and combined them with numeric covariates
+    if(n.factor>0){
+      for (i in 1:n.factor) {
+        pca_sampled <- cbind(pca_sampled,
+                             rep(sample(samplingRegion$id_range$factor[[i]], 1, replace = TRUE),
+                                 n_good_numeric_sampled))
+      }
     }
+    colnames(pca_sampled)<-c(colnames(samplingRegion$data_range$numeric),
+                             names(samplingRegion$data_range$factor))
+    return(pca_sampled)
+  }else{
+    # if pcaSamplingContinuous' return is null
+    return(NULL)
   }
-  colnames(pca_sampled)<-c(colnames(samplingRegion$data_range$numeric),names(samplingRegion$data_range$factor))
-  return(pca_sampled)
 }
 
 # marginal random sampling based on pca random sampling
@@ -147,16 +158,29 @@ marginalRandomSampling <- function(samplingRegion, samplingParameters, n){
     return(randomSampling(samplingRegion, samplingParameters=NULL, n))
   }else{
     pca_sampled = pcaSamplingSizeOne(X, samplingRegion, samplingParameters$percentageVariance)
-    sz = dim(pca_sampled)[1]
+    if(is.null(pca_sampled)){
+      sz = 0
+    }else{
+      sz = dim(pca_sampled)[1]
+    }
     while (sz<n) {
       pca_sampled = rbind(pca_sampled, pcaSamplingSizeOne(X, samplingRegion,
                                                           samplingParameters$percentageVariance))
-      sz = dim(pca_sampled)[1]
+      if(is.null(pca_sampled)){
+        sz = 0
+      }else{
+        sz = dim(pca_sampled)[1]
+      }
     }
+    #print(head(pca_sampled))
     # factor()
     for (i in 1:length(samplingRegion$data_range$names)) {
+      #print(names(samplingRegion$data_range$factor))
+      #print(i)
+      #print(colnames(pca_sampled)[i])
       if(colnames(pca_sampled)[i] %in% names(samplingRegion$data_range$factor)){
-        pca_sampled[,i] = factor(pca_sampled[,i],levels = samplingRegion$data_range$factor[[colnames(pca_sampled)[i]]])
+        pca_sampled[,i] = factor(pca_sampled[,i],
+                                 levels = samplingRegion$data_range$factor[[colnames(pca_sampled)[i]]])
       }
     }
     return(pca_sampled)

@@ -110,7 +110,7 @@ samplingRegion <- function(id,X_range,treeInfo){
       for (j in 1:length(X_range$factor)) {
         if(df_factor$var[i]==names(X_range$factor)[j]){
           unlist(strsplit(df_factor$split[i], ","))->tp_i
-          id_X_range$factor[[j]] = intersect(X_range$factor[[j]], tp_i)
+          id_X_range$factor[[j]] = intersect(id_X_range$factor[[j]], tp_i)
         }
       }
     }
