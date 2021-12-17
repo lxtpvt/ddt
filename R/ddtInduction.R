@@ -95,7 +95,7 @@ createNodeInfo <- function(nid, parentNodeInfo, secondClassStabilityStump, dataR
   # if it is the root
   if(nid==1){
     newPseudoTreeInfo = data.frame(list(var = "<leaf>",
-                                              nid = 1,conditions = "root"))
+                                              nid = 1,conditions = "root"), stringsAsFactors=FALSE)
     parentNodeInfo = list(nid = 1, pseudoTreeInfo = newPseudoTreeInfo)
   }
 
