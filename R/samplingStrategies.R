@@ -17,6 +17,8 @@ setSamplingStrategy <- function(samplingMethod, samplingRegion, samplingParamete
 # uniform random sampling
 randomSampling <- function(samplingRegion, samplingParameters=NULL, n){
 
+  #set.seed(round(runif(n=1, min =1, max = 200000)))
+
   X_sampled <- data.frame(matrix(NA,    # Create empty data frame
                                  nrow = n,
                                  ncol = length(samplingRegion$data_range$names)))
@@ -52,6 +54,8 @@ randomSampling <- function(samplingRegion, samplingParameters=NULL, n){
 
 # samplingRegionNumeric: a matrix for the hypercube support of continuous covariates
 pcaSamplingContinuous <- function(X, percentageVariance , samplingRegionNumeric) {
+
+  #set.seed(round(runif(n=1, min =1, max = 100000)))
 
   p = dim(X)[2]
   res.pca <- prcomp(X,scale=TRUE)
@@ -111,6 +115,7 @@ pcaSamplingContinuous <- function(X, percentageVariance , samplingRegionNumeric)
 
 # pca sampling include both categorical and numerical covariates
 pcaSamplingSizeOne <- function(X, samplingRegion, percentageVariance){
+
   # if numerical covariates do exist
   # first, do pca sampling
   X.continuous = X[,colnames(samplingRegion$data_range$numeric)]

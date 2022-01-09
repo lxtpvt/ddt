@@ -1,5 +1,4 @@
 
-
 parseCondition <- function(condition){
 
   signs1 = c(">=","<=","!=")
@@ -19,10 +18,22 @@ parseCondition <- function(condition){
       return(split)
     }
   }
-
 }
 
+isNumeric <- function(strName, dR){
 
+  if(strName %in% dR$names){
+    if(strName %in% names(dR$factor)){
+      return(F)
+    }else{
+      return(T)
+    }
+
+  }else{
+    return(NULL)
+  }
+
+}
 
 
 

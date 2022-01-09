@@ -35,20 +35,16 @@ stumps <- function(nSim, fitedModel, samplingStrategies, sampleSize, rpartParas)
 
 # analysis split (stump) stability
 # extract simulation results to a matrix
-stumpsToMat <- function(stumps){
-
+stumpsToMat <- function(stumps_list){
   simRes = list()
-  for (stump in stumps$stump_list) {
+  for (stump in stumps_list) {
     treeInfo(stump) -> stumpInfo
-    var = stumpInfo$var[1]
+    var = as.character(stumpInfo$var[1])
     condition = stumpInfo$conditions[2]
     split = parseCondition(condition)
     simRes = append(simRes, list(c(var = var, split = split)))
   }
-
-
   simResMatStump = do.call(rbind, simRes)
-
   return(simResMatStump)
 }
 
@@ -90,12 +86,13 @@ secondClassStabilityStump <- function(nameCov, isNumeric, simResMatStump){
   }
 }
 
+# create node infor
 createNodeInfo <- function(nid, parentNodeInfo, secondClassStabilityStump, dataRange){
 
   # if it is the root
   if(nid==1){
     newPseudoTreeInfo = data.frame(list(var = "<leaf>",
-                                              nid = 1,conditions = "root"), stringsAsFactors=FALSE)
+                                        nid = 1,conditions = "root"),stringsAsFactors=FALSE)
     parentNodeInfo = list(nid = 1, pseudoTreeInfo = newPseudoTreeInfo)
   }
 
@@ -106,6 +103,7 @@ createNodeInfo <- function(nid, parentNodeInfo, secondClassStabilityStump, dataR
     }else{
       # create a new PseudoTreeInfo
       newPseudoTreeInfo = parentNodeInfo$pseudoTreeInfo
+
       # (1) modify the var column
       newPseudoTreeInfo$var[which(newPseudoTreeInfo$nid==nid)] = secondClassStabilityStump$name
       # (2) add two children
@@ -115,8 +113,9 @@ createNodeInfo <- function(nid, parentNodeInfo, secondClassStabilityStump, dataR
                                as.character(secondClassStabilityStump$max))
         strCondition2 = paste0(secondClassStabilityStump$name, "<",
                                as.character(secondClassStabilityStump$max))
-      }else{
 
+      }else{
+        print("is factor")
         unlist(strsplit(secondClassStabilityStump$max, ","))->tp_max
         dataRange$factor[[secondClassStabilityStump$name]]->all_level
         setdiff(all_level,tp_max) -> tp_n_max
@@ -143,7 +142,6 @@ createNodeInfo <- function(nid, parentNodeInfo, secondClassStabilityStump, dataR
     return("This nid is not in the pseudoTreeInfo.")
   }
 }
-
 
 
 
