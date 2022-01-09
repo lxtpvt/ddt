@@ -181,8 +181,9 @@ marginalRandomSampling <- function(samplingRegion, samplingParameters, n){
     # factor()
     for (i in 1:length(samplingRegion$data_range$names)) {
       #print(names(samplingRegion$data_range$factor))
-      #print(i)
-      #print(colnames(pca_sampled)[i])
+      print(i)
+      print(samplingRegion$data_range$names))
+      print(colnames(pca_sampled))
       if(colnames(pca_sampled)[i] %in% names(samplingRegion$data_range$factor)){
         pca_sampled[,i] = factor(pca_sampled[,i],
                                  levels = samplingRegion$data_range$factor[[colnames(pca_sampled)[i]]])
