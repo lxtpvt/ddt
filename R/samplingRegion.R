@@ -99,7 +99,6 @@ rangeConditions <- function(id,treeInfo){
 }
 
 samplingRegion <- function(id,X_range,treeInfo){
-
   id_X_range = X_range
   df_conditions = rangeConditions(id,treeInfo)
   df_numeric = df_conditions$numeric

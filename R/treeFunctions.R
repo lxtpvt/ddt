@@ -11,6 +11,10 @@ getRids <- function(id){
   rids
 }
 
+getAllNidByLevel <- function(level){
+  return(1:(2^(level+1)-1))
+}
+
 
 treeInfo <- function(tree, digits = 5, minlength = 0L){
   frame=tree$frame
@@ -57,22 +61,22 @@ snipNodes <- function(stableNodes){
 }
 
 # create node information
-createNodeInfo <- function(nid, parentNodeInfo, secondClassStabilityStump, dataRange){
+pseudoTreeInfo <- function(nid, parentTreeInfo, secondClassStabilityStump, dataRange){
 
   # if it is the root
   if(nid==1){
     newPseudoTreeInfo = data.frame(list(var = "<leaf>",
                                         nid = 1,conditions = "root"), stringsAsFactors=FALSE)
-    parentNodeInfo = list(nid = 1, pseudoTreeInfo = newPseudoTreeInfo)
+    parentTreeInfo = list(nid = 1, pseudoTreeInfo = newPseudoTreeInfo)
   }
   # if nid is in the pseudoTreeInfo
-  if(nid %in% parentNodeInfo$pseudoTreeInfo$nid){
+  if(nid %in% parentTreeInfo$pseudoTreeInfo$nid){
     # if children already exist
-    if((nid*2) %in% parentNodeInfo$pseudoTreeInfo$nid | (nid*2+1) %in% parentNodeInfo$pseudoTreeInfo$nid){
+    if((nid*2) %in% parentTreeInfo$pseudoTreeInfo$nid | (nid*2+1) %in% parentTreeInfo$pseudoTreeInfo$nid){
       return("Child node is already in the tree.")
     }else{
       # create a new PseudoTreeInfo
-      newPseudoTreeInfo = parentNodeInfo$pseudoTreeInfo
+      newPseudoTreeInfo = parentTreeInfo$pseudoTreeInfo
 
       # (1) modify the var column
       newPseudoTreeInfo$var[which(newPseudoTreeInfo$nid==nid)] = secondClassStabilityStump$name
@@ -90,8 +94,10 @@ createNodeInfo <- function(nid, parentNodeInfo, secondClassStabilityStump, dataR
         dataRange$factor[[secondClassStabilityStump$name]]->all_level
         setdiff(all_level,tp_max) -> tp_n_max
         tp = tp_n_max[1]
-        for (i in 2:length(tp_n_max)) {
-          tp = paste0(tp,",",tp_n_max[i])
+        if(length(tp_n_max)>1){
+          for (i in 2:length(tp_n_max)) {
+            tp = paste0(tp,",",tp_n_max[i])
+          }
         }
         strCondition1 = paste0(secondClassStabilityStump$name, "=",
                                secondClassStabilityStump$max)
@@ -113,6 +119,19 @@ createNodeInfo <- function(nid, parentNodeInfo, secondClassStabilityStump, dataR
 }
 
 
+modifyPseudoTreeInfo <- function(nid, dataRange, stumpsRes, parentTreeInfo=NULL){
+  simResMatStump = stumpsToMat(stumpsRes$stump_list)
+  # first order stability
+  pmf_mat = firstClassStabilityStump(dataRange$data_range$names, simResMatStump)
+  # best covariate
+  bestCovName = colnames(pmf_mat)[which.max(pmf_mat)]
+  # second order stability
+  secStb = secondClassStabilityStump(nameCov=bestCovName,
+                                     isNumeric=isNumeric(bestCovName, dataRange$data_range), simResMatStump)
+  # create node info
+  tInfo = pseudoTreeInfo(nid=nid, parentTreeInfo=parentTreeInfo, secStb, dataRange$data_range)
+  return(tInfo)
+}
 
 
 

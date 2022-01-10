@@ -676,21 +676,21 @@ pcaPara = setSamplingParameters(null = F, X=NULL, percentageVariance = 0.7, nRan
 # run for first split
 
 # set root sampling strategies
-# stgPca_root = setSamplingStrategy(samplingMethod="marginalRandomSampling",
-#                              samplingRegion=sR,samplingParameters=pcaPara_root)
-# n_X = dim(X)[1]
-# samplingStrategies = list()
-# sampleSize = list()
-# n = 2
-# for (i in n:n) {
-#   samplingStrategies = append(samplingStrategies, list(stgPca_root))
-#   sampleSize = append(sampleSize, list(i*100*n_X))
-# }
-#
-# # run simulation
-# stumpsRes_root=stumpsParallel(nSim, fitedModel=mtcars_rf, samplingStrategies, sampleSize, rpartParas)
-# # analysis simulation results and store it.
-# stumps_mat_root = stumpsToMat(stumpsRes_root$stump_list[[1]])
+stgPca_root = setSamplingStrategy(samplingMethod="marginalRandomSampling",
+                             samplingRegion=sR,samplingParameters=pcaPara_root)
+n_X = dim(X)[1]
+samplingStrategies = list()
+sampleSize = list()
+n = 2
+for (i in n:n) {
+  samplingStrategies = append(samplingStrategies, list(stgPca_root))
+  sampleSize = append(sampleSize, list(i*100*n_X))
+}
+
+# run simulation
+stumpsRes_root=stumpsParallel(nSim, fitedModel=mtcars_rf, samplingStrategies, sampleSize, rpartParas)
+# analysis simulation results and store it.
+stumps_mat_root = stumpsToMat(stumpsRes_root$stump_list[[1]])
 # save(stumps_mat_root, file = "stumps_mat_root.RData")
 
 load("stumps_mat_root.RData")

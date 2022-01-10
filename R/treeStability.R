@@ -192,6 +192,7 @@ nextSamplingRegion <- function(nid, X_range, stb_list, simRes, first_class_crite
 stumpsToMat <- function(stumps_list){
   simRes = list()
   for (stump in stumps_list) {
+    #print(stump)
     treeInfo(stump) -> stumpInfo
     var = as.character(stumpInfo$var[1])
     condition = stumpInfo$conditions[2]
