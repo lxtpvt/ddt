@@ -606,13 +606,11 @@ createNodeInfo <- function(nid, parentNodeInfo, secondClassStabilityStump, dataR
 }
 
 
-birth <- function(nid, nSim, dataRange, sampleSize, secondClassStability, nodeInfo,
+birth <- function(nid, nSim, dataRange, sampleSize, nodeInfo,
                   samplingParameters, samplingMethod, fitedModel, rpartParas){
 
   samplingRegion(2*nid,dataRange$data_range,nodeInfo$pseudoTreeInfo)->sR_l
   samplingRegion((2*nid+1), dataRange$data_range,nodeInfo$pseudoTreeInfo)->sR_r
-  print(sR_l$id_range)
-  print(sR_r$id_range)
 
   # set root sampling strategies
   stgPca_l = setSamplingStrategy(samplingMethod=samplingMethod,
@@ -708,8 +706,7 @@ save(info_root, file = "info_root.RData")
 # load the parent node information
 # load("info_root.RData")
 #
-re23 = birth(nid=1, nSim, dataRange = sR, sampleSize = list(3000),
-             secondClassStability = secStb, nodeInfo = info_root,
+re23 = birth(nid=1, nSim, dataRange = sR, sampleSize = list(3000), nodeInfo = info_root,
              samplingParameters=pcaPara, samplingMethod = "marginalRandomSampling",
              fitedModel = mtcars_rf, rpartParas)
 

@@ -1,5 +1,6 @@
-
-
+#===============================================================================
+# Single tree stability
+#===============================================================================
 stableSampleSize <- function(fitedModel, samplingStrategy, rpartParas, sampleSize_v, criterion){
 
   m = length(sampleSize_v)
@@ -182,7 +183,90 @@ nextSamplingRegion <- function(nid, X_range, stb_list, simRes, first_class_crite
 
 }
 
+#===============================================================================
+# Single stump stability for tree induction
+#===============================================================================
 
-#rpart:::tree.depth(as.numeric(rownames(boston_tree$frame)))->treeDp
+# analysis split (stump) stability
+# extract simulation results to a matrix
+stumpsToMat <- function(stumps_list){
+  simRes = list()
+  for (stump in stumps_list) {
+    treeInfo(stump) -> stumpInfo
+    var = as.character(stumpInfo$var[1])
+    condition = stumpInfo$conditions[2]
+    split = parseCondition(condition)
+    simRes = append(simRes, list(c(var = var, split = split)))
+  }
+  simResMatStump = do.call(rbind, simRes)
+  return(simResMatStump)
+}
+
+# create the pmf of covariates
+firstClassStabilityStump <- function(namesCovariates, simResMatStump){
+
+  length(namesCovariates) -> p
+  pmf_mat = matrix(0,nrow = 1,ncol = p)
+  colnames(pmf_mat)<-namesCovariates
+  n = dim(simResMatStump)[1]
+  if(is.null(simResMatStump) | n==0){
+    return("simResMatStump can't be empty!")
+  }
+  for (i in 1:p) {
+
+    id_flag = (simResMatStump[,"var"]==namesCovariates[i])
+    pmf_mat[1,namesCovariates[i]] = sum(id_flag)/n
+
+  }
+  return(pmf_mat)
+
+}
+
+# analyze simulation results based on covariate name
+secondClassStabilityStump <- function(nameCov, isNumeric, simResMatStump){
+  if(is.null(simResMatStump)){
+    return("simResMat can't be empty!")
+  }
+  n = dim(simResMatStump)[1]
+  ids = (simResMatStump[,"var"]==nameCov)
+  if(isNumeric){
+    if(n>1){
+      x = as.numeric(simResMatStump[ids,"split"])
+      dx <- density(x,bw = "SJ")
+      max = dx$x[which.max(dx$y)]
+    }else{
+      # if n=1
+      dx = NULL
+      max=simResMatStump[1, "split"]
+    }
+    return(list(name = nameCov, isNumeric = isNumeric, density = dx, max=max))
+  }else{
+    if(n>1){
+      prop.table(table(simResMatStump[ids,"split"])) -> a
+    }else{
+      # if n=1
+      a = NULL
+      max=simResMatStump[1, "var"]
+    }
+    return(list(name = nameCov, isNumeric = isNumeric, prop.table = a, max = names(which.max(a))))
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
