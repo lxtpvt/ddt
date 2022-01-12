@@ -19,6 +19,9 @@ getRids <- function(id){
   rids
 }
 
+getAllNidByLevel <- function(level){
+  return(1:(2^(level+1)-1))
+}
 
 treeInfo <- function(tree, digits = 5, minlength = 0L){
   frame=tree$frame
@@ -27,44 +30,81 @@ treeInfo <- function(tree, digits = 5, minlength = 0L){
   frame
 }
 
+# create node information
+pseudoTreeInfo <- function(nid, parentTreeInfo, secondClassStabilityStump, dataRange){
 
-splitTable <- function(treeInfo){
-  treeInfo[treeInfo$var!="<leaf>",c("nid","var")] -> table
-  table$split = NA
-  dim(table)[1]->n
-  for (i in 1:n) {
-    tempId = 2*table$nid[i]
-    rangeConditions(tempId,treeInfo) -> conditions
-    a = conditions$numeric[which(conditions$numeric$nid==tempId),"split"]
-    b = conditions$factor[which(conditions$factor$nid==tempId),"split"]
-    if(length(a>0)){
-      table$split[i]=a
-    }else if(length(b>0)){
-      table$split[i]=b
-    }
+  # if it is the root
+  if(nid==1){
+    newPseudoTreeInfo = data.frame(list(var = "<leaf>",
+                                        nid = 1,conditions = "root"), stringsAsFactors=FALSE)
+    parentTreeInfo = list(nid = 1, pseudoTreeInfo = newPseudoTreeInfo)
   }
-  return(table[order(table$nid),])
-}
+  # if nid is in the pseudoTreeInfo
+  if(nid %in% parentTreeInfo$pseudoTreeInfo$nid){
+    # if children already exist
+    if((nid*2) %in% parentTreeInfo$pseudoTreeInfo$nid | (nid*2+1) %in% parentTreeInfo$pseudoTreeInfo$nid){
+      return("Child node is already in the tree.")
+    }else{
+      # create a new PseudoTreeInfo
+      newPseudoTreeInfo = parentTreeInfo$pseudoTreeInfo
 
-snipNodes <- function(stableNodes){
-  n_list = length(stableNodes)
-  stableNodes_v = as.integer(unlist(stableNodes))
-  for (i in n_list:1) {
-    id_v = getRids(as.integer(stableNodes[[i]]))
-    for (id in id_v) {
-      if(!(id %in% stableNodes_v)){
-        stableNodes_v[i]=NA
+      # (1) modify the var column
+      newPseudoTreeInfo$var[which(newPseudoTreeInfo$nid==nid)] = secondClassStabilityStump$name
+      # (2) add two children
+      if(secondClassStabilityStump$isNumeric){
+        # if split on a numerical covariate
+        strCondition1 = paste0(secondClassStabilityStump$name, ">=",
+                               as.character(secondClassStabilityStump$max))
+        strCondition2 = paste0(secondClassStabilityStump$name, "<",
+                               as.character(secondClassStabilityStump$max))
+
+      }else{
+        # if split on a factor covariate
+        unlist(strsplit(secondClassStabilityStump$max, ","))->tp_max
+        dataRange$factor[[secondClassStabilityStump$name]]->all_level
+        setdiff(all_level,tp_max) -> tp_n_max
+        tp = tp_n_max[1]
+        if(length(tp_n_max)>1){
+          for (i in 2:length(tp_n_max)) {
+            tp = paste0(tp,",",tp_n_max[i])
+          }
+        }
+        strCondition1 = paste0(secondClassStabilityStump$name, "=",
+                               secondClassStabilityStump$max)
+
+        strCondition2 = paste0(secondClassStabilityStump$name, "=", tp)
       }
+      # add the children to newPseudoTreeInfo
+      newPseudoTreeInfo = rbind(newPseudoTreeInfo,
+                                list(var = "<leaf>", nid = nid*2,
+                                     conditions = strCondition1))
+      newPseudoTreeInfo = rbind(newPseudoTreeInfo,
+                                list(var = "<leaf>", nid = nid*2+1,
+                                     conditions = strCondition2))
+      return(list(nid = nid, pseudoTreeInfo = newPseudoTreeInfo))
     }
+  }else{
+    return("This nid is not in the pseudoTreeInfo.")
   }
-  as.vector(na.omit(stableNodes_v))->nodes_keep
-  l_children = nodes_keep*2
-  r_children = nodes_keep*2 + 1
-  return(setdiff(union(l_children, r_children),nodes_keep))
-
 }
 
-
+modifyPseudoTreeInfo <- function(nid, dataRange, stumpsRes, parentTreeInfo=NULL){
+  if(length(stumpsRes$stump_list)==1){
+    simResMatStump = stumpsToMat(stumpsRes$stump_list[[1]])
+  }else if(length(stumpsRes$stump_list)>1){
+    simResMatStump = stumpsToMat(stumpsRes$stump_list)
+  }
+  # first order stability
+  pmf_mat = firstClassStabilityStump(dataRange$data_range$names, simResMatStump)
+  # best covariate
+  bestCovName = colnames(pmf_mat)[which.max(pmf_mat)]
+  # second order stability
+  secStb = secondClassStabilityStump(nameCov=bestCovName,
+                                     isNumeric=isNumeric(bestCovName, dataRange$data_range), simResMatStump)
+  # create node info
+  tInfo = pseudoTreeInfo(nid=nid, parentTreeInfo=parentTreeInfo, secStb, dataRange$data_range)
+  return(tInfo)
+}
 #=========================================================================================================
 # sampling region
 #=========================================================================================================
@@ -463,6 +503,37 @@ isNumeric <- function(strName, dR){
 
 
 # Fit a large number of stumps
+stumps <- function(nSim, fitedModel, samplingStrategies, sampleSize, rpartParas){
+
+  # check the maxdepth parameter in rpart.control to keep maxdepth = 1
+  if(rpartParas$control$maxdepth!=1){
+    return("The maxdepth parameter should be set to 1!")
+  }
+  nStrategies = length(samplingStrategies)
+  length(samplingStrategies[[1]]$samplingRegion$data_range$names) -> p
+  samplingStrategies[[1]]$samplingRegion$data_range$names -> namesCov
+
+  spT = list()
+
+
+  for (j in 1:nStrategies) {
+    for (i in 1:nSim) {
+      X = do.call(samplingStrategies[[j]]$samplingMethod,
+                  list(samplingStrategies[[j]]$samplingRegion,
+                       samplingStrategies[[j]]$samplingParameters, sampleSize[[j]]))
+      #print(head(X))
+      y = do.call("predict",list(fitedModel,X))
+      df = data.frame(X,y)
+      stump = rpart(y~., data = df, method = rpartParas$method, control = rpartParas$control)
+      spT = append(spT, list(stump))
+      print(paste0(i, " out of ", nSim))
+    }
+  }
+  return(stumpsList = list(stump_list = spT, samplingStrategies=samplingStrategies,
+                           sampleSize=sampleSize, namesCov=namesCov))
+}
+
+# parallel version
 stumpsParallel <- function(nSim, fitedModel, samplingStrategies, sampleSize, rpartParas, rm_seed=1){
 
   func_list = c("dataRange", "rangeConditions", "samplingRegion",
@@ -479,27 +550,78 @@ stumpsParallel <- function(nSim, fitedModel, samplingStrategies, sampleSize, rpa
   for (j in 1:nStrategies) {
     temp_spT =  foreach(i = 1:nSim, .export= func_list,
                         .packages = c("randomForest", "rpart")) %dopar% {
-      set.seed(rm_seed*i*j)
-      X = do.call(samplingStrategies[[j]]$samplingMethod,
-                  list(samplingStrategies[[j]]$samplingRegion,
-                       samplingStrategies[[j]]$samplingParameters, sampleSize[[j]]))
-      y = do.call("predict",list(fitedModel,X))
-      df = data.frame(X,y)
-      stump = rpart(y~., data = df, method = rpartParas$method, control = rpartParas$control)
-    }
+                          set.seed(rm_seed*i*j)
+                          X = do.call(samplingStrategies[[j]]$samplingMethod,
+                                      list(samplingStrategies[[j]]$samplingRegion,
+                                           samplingStrategies[[j]]$samplingParameters, sampleSize[[j]]))
+                          y = do.call("predict",list(fitedModel,X))
+                          df = data.frame(X,y)
+                          stump = rpart(y~., data = df, method = rpartParas$method, control = rpartParas$control)
+                        }
     spT = append(spT, list(temp_spT))
   }
-
   return(stumpsList = list(stump_list = spT, samplingStrategies=samplingStrategies,
                            sampleSize=sampleSize, namesCov=namesCov))
 }
 
+
+# birth two children
+birth <- function(nid, nSim, dataRange, sampleSize, pTreeInfo, stumpFun,
+                  samplingParameters, samplingMethod, fitedModel, rpartParas){
+
+  samplingRegion(nid,dataRange$data_range,pTreeInfo$pseudoTreeInfo)->sR
+  #print(sR$id_range)
+  # set root sampling strategies
+  stg = setSamplingStrategy(samplingMethod=samplingMethod,
+                            samplingRegion=sR,samplingParameters=samplingParameters)
+  samplingStrategies = list(stg)
+  # run simulation
+  stumpsRes=do.call(stumpFun, list(nSim, fitedModel, samplingStrategies, sampleSize, rpartParas))
+  # analysis simulation results and store it.
+  #stumps_mat = stumpsToMat(stumpsRes$stump_list[[1]])
+  return(list(nid = nid, stumpsRes = stumpsRes))
+
+}
+
+inductionByLevel <- function(level, dataX, samplingMethod, samplingParameters, stumpFun,
+                             nSim, fitedModel, sampleSize, rpartParas){
+  nids = getAllNidByLevel(level)
+  sR = setSamplingRegion(X_range = dataRange(X))
+  simResMatList = list()
+  for (nid in nids) {
+    if(nid==1){
+      # if it's the root
+      # set root sampling strategies
+      stg = setSamplingStrategy(samplingMethod=samplingMethod,
+                                samplingRegion=sR,samplingParameters=samplingParameters)
+      samplingStrategies = list(stg)
+      stumpsRes = do.call(stumpFun, list(nSim, fitedModel, samplingStrategies, sampleSize, rpartParas))
+      treeInfo = modifyPseudoTreeInfo(nid = nid, dataRange = sR, stumpsRes = stumpsRes)
+      simResMatList = append(simResMatList, list(stumpsToMat(stumpsRes$stump_list)))
+    }else{
+      resBirth = birth(nid=nid, nSim=nSim, dataRange=sR, sampleSize=sampleSize,
+                       pTreeInfo=treeInfo, stumpFun=stumpFun, samplingParameters=samplingParameters,
+                       samplingMethod=samplingMethod, fitedModel=fitedModel, rpartParas=rpartParas)
+      treeInfo = modifyPseudoTreeInfo(nid = nid, dataRange = sR,
+                                      stumpsRes = resBirth$stumpsRes, parentTreeInfo = treeInfo)
+      simResMatList = append(simResMatList, list(stumpsToMat(resBirth$stumpsRes$stump_list)))
+    }
+  }
+  return(list(treeInfo = treeInfo, simResMatList = simResMatList))
+}
+
+
+
+#===============================================================================
+# Single stump stability for tree induction
+#===============================================================================
 
 # analysis split (stump) stability
 # extract simulation results to a matrix
 stumpsToMat <- function(stumps_list){
   simRes = list()
   for (stump in stumps_list) {
+    #print(stump)
     treeInfo(stump) -> stumpInfo
     var = as.character(stumpInfo$var[1])
     condition = stumpInfo$conditions[2]
@@ -520,7 +642,6 @@ firstClassStabilityStump <- function(namesCovariates, simResMatStump){
   if(is.null(simResMatStump) | n==0){
     return("simResMatStump can't be empty!")
   }
-
   for (i in 1:p) {
 
     id_flag = (simResMatStump[,"var"]==namesCovariates[i])
@@ -536,103 +657,34 @@ secondClassStabilityStump <- function(nameCov, isNumeric, simResMatStump){
   if(is.null(simResMatStump)){
     return("simResMat can't be empty!")
   }
+  n = dim(simResMatStump)[1]
   ids = (simResMatStump[,"var"]==nameCov)
   if(isNumeric){
-    x = as.numeric(simResMatStump[ids,"split"])
-    dx <- density(x,bw = "SJ")
-    max = dx$x[which.max(dx$y)]
+    if(n>1){
+      x = as.numeric(simResMatStump[ids,"split"])
+      dx <- density(x,bw = "SJ")
+      max = dx$x[which.max(dx$y)]
+    }else{
+      # if n=1
+      dx = NULL
+      max=simResMatStump[1, "split"]
+    }
     return(list(name = nameCov, isNumeric = isNumeric, density = dx, max=max))
   }else{
-    prop.table(table(simResMatStump[ids,"split"])) -> a
+    if(n>1){
+      prop.table(table(simResMatStump[ids,"split"])) -> a
+    }else{
+      # if n=1
+      a = NULL
+      max=simResMatStump[1, "var"]
+    }
     return(list(name = nameCov, isNumeric = isNumeric, prop.table = a, max = names(which.max(a))))
   }
 }
 
-# create node infor
-createNodeInfo <- function(nid, parentNodeInfo, secondClassStabilityStump, dataRange){
-
-  # if it is the root
-  if(nid==1){
-    newPseudoTreeInfo = data.frame(list(var = "<leaf>",
-                                        nid = 1,conditions = "root"),stringsAsFactors=FALSE)
-    parentNodeInfo = list(nid = 1, pseudoTreeInfo = newPseudoTreeInfo)
-  }
-
-  if(nid %in% parentNodeInfo$pseudoTreeInfo$nid){
-    # if children already exist
-    if((nid*2) %in% parentNodeInfo$pseudoTreeInfo$nid | (nid*2+1) %in% parentNodeInfo$pseudoTreeInfo$nid){
-      return("Child node is already in the tree.")
-    }else{
-      # create a new PseudoTreeInfo
-      newPseudoTreeInfo = parentNodeInfo$pseudoTreeInfo
-
-      # (1) modify the var column
-      newPseudoTreeInfo$var[which(newPseudoTreeInfo$nid==nid)] = secondClassStabilityStump$name
-      # (2) add two children
-      if(secondClassStabilityStump$isNumeric){
-        # if split on a numerical covariate
-        strCondition1 = paste0(secondClassStabilityStump$name, ">=",
-                               as.character(secondClassStabilityStump$max))
-        strCondition2 = paste0(secondClassStabilityStump$name, "<",
-                               as.character(secondClassStabilityStump$max))
-
-      }else{
-        print("is factor")
-        unlist(strsplit(secondClassStabilityStump$max, ","))->tp_max
-        dataRange$factor[[secondClassStabilityStump$name]]->all_level
-        setdiff(all_level,tp_max) -> tp_n_max
-        tp = tp_n_max[1]
-        for (i in 2:length(tp_n_max)) {
-          tp = paste0(tp,",",tp_n_max[i])
-        }
-        # if split on a factor covariate
-        strCondition1 = paste0(secondClassStabilityStump$name, "=",
-                               secondClassStabilityStump$max)
-
-        strCondition2 = paste0(secondClassStabilityStump$name, "=", tp)
-      }
-      # add the children to newPseudoTreeInfo
-      newPseudoTreeInfo = rbind(newPseudoTreeInfo,
-                                list(var = "<leaf>", nid = nid*2,
-                                     conditions = strCondition1))
-      newPseudoTreeInfo = rbind(newPseudoTreeInfo,
-                                list(var = "<leaf>", nid = nid*2+1,
-                                     conditions = strCondition2))
-      return(list(nid = nid, pseudoTreeInfo = newPseudoTreeInfo))
-    }
-  }else{
-    return("This nid is not in the pseudoTreeInfo.")
-  }
-}
-
-
-birth <- function(nid, nSim, dataRange, sampleSize, nodeInfo,
-                  samplingParameters, samplingMethod, fitedModel, rpartParas){
-
-  samplingRegion(2*nid,dataRange$data_range,nodeInfo$pseudoTreeInfo)->sR_l
-  samplingRegion((2*nid+1), dataRange$data_range,nodeInfo$pseudoTreeInfo)->sR_r
-
-  # set root sampling strategies
-  stgPca_l = setSamplingStrategy(samplingMethod=samplingMethod,
-                                 samplingRegion=sR_l,samplingParameters=samplingParameters)
-  stgPca_r = setSamplingStrategy(samplingMethod=samplingMethod,
-                                 samplingRegion=sR_r,samplingParameters=samplingParameters)
-
-  # run simulation
-  samplingStrategies = list(stgPca_l)
-  stumpsRes_l=stumpsParallel(nSim, fitedModel, samplingStrategies, sampleSize, rpartParas)
-  # analysis simulation results and store it.
-  stumps_mat_l = stumpsToMat(stumpsRes_l$stump_list[[1]])
-
-  samplingStrategies = list(stgPca_r)
-  stumpsRes_r=stumpsParallel(nSim, fitedModel, samplingStrategies, sampleSize, rpartParas, rm_seed = 2)
-  # analysis simulation results and store it.
-  stumps_mat_r = stumpsToMat(stumpsRes_r$stump_list[[1]])
-
-  return(list(pId = nid, lchild = stumps_mat_l, rchild = stumps_mat_r))
-
-}
-
+#=========================================================================================================
+# run simulation
+#=========================================================================================================
 #=========================================================================================================
 # run simulation
 #=========================================================================================================
@@ -652,7 +704,7 @@ covNames = sR$data_range$names
 
 #===========================================
 # number of simulations
-nSim=100
+nSim=50
 
 #===========================================
 # set rpart parameters for fitting stump
@@ -662,93 +714,24 @@ rpartParas = setRpartPara(method = "anova", control=ctl, predict_type="vector")
 #===========================================
 # Black-box model, random forest
 mtcars_rf <- randomForest(mpg ~ ., data = mtcars2, importance = TRUE)
-save(mtcars_rf, file = "mtcars_rf.RData")
-#load("mtcars_rf.RData")
+
 #===========================================
 # set sampling parameters
 
 # root
-pcaPara_root = setSamplingParameters(null = F, X=X, percentageVariance = 0.7)
+#pcaPara_root = setSamplingParameters(null = F, X=X, percentageVariance = 0.7)
 # other nodes
-pcaPara = setSamplingParameters(null = F, X=NULL, percentageVariance = 0.7, nRandomSampling = 1000)
+pcaPara = setSamplingParameters(null = F, X=NULL, percentageVariance = 0.7, nRandomSampling = 5000)
 
-#===========================================
-# run for first split
-
-# set root sampling strategies
-stgPca_root = setSamplingStrategy(samplingMethod="marginalRandomSampling",
-                             samplingRegion=sR,samplingParameters=pcaPara_root)
 n_X = dim(X)[1]
-samplingStrategies = list()
 sampleSize = list()
-n = 2
-for (i in n:n) {
-  samplingStrategies = append(samplingStrategies, list(stgPca_root))
-  sampleSize = append(sampleSize, list(i*100*n_X))
+n = 1
+for (i in 1:n) {
+  sampleSize = append(sampleSize, list(i*300*n_X))
 }
 
-# run simulation
-stumpsRes_root=stumpsParallel(nSim, fitedModel=mtcars_rf, samplingStrategies, sampleSize, rpartParas)
-# analysis simulation results and store it.
-stumps_mat_root = stumpsToMat(stumpsRes_root$stump_list[[1]])
-# save(stumps_mat_root, file = "stumps_mat_root.RData")
+#===============================================================================
 
-load("stumps_mat_root.RData")
-#
-secStb = secondClassStabilityStump(nameCov="disp",
-                                   isNumeric=T, stumps_mat_root)
-info_root = createNodeInfo(nid=1, parentNodeInfo=NULL, secStb, sR$data_range)
-save(info_root, file = "info_root.RData")
-
-#===========================================
-# run for other splits
-
-# load the parent node information
-# load("info_root.RData")
-#
-re23 = birth(nid=1, nSim, dataRange = sR, sampleSize = list(3000), nodeInfo = info_root,
-             samplingParameters=pcaPara, samplingMethod = "marginalRandomSampling",
-             fitedModel = mtcars_rf, rpartParas)
-
-save(re23, file = "re23.RData")
-
-#load("re23.RData")
-
-# first order stability
-pmf_mat = firstClassStabilityStump(sR$data_range$names, re23$lchild)
-# best covariate
-bestCovName = colnames(pmf_mat)[which.max(pmf_mat)]
-# second order stability
-secStb = secondClassStabilityStump(nameCov=bestCovName,
-                                   isNumeric=isNumeric(bestCovName,sR$data_range), re23$lchild)
-
-# create and save node 2 info
-info2 = createNodeInfo(nid=2, parentNodeInfo=info_root, secStb, sR$data_range)
-save(info2, file = "info2.RData")
-
-re45 = birth(nid=2, nSim, dataRange = sR, sampleSize = list(3000),
-             secondClassStability = secStb, nodeInfo = info2,
-              samplingParameters=pcaPara, samplingMethod = "marginalRandomSampling",
-             fitedModel = mtcars_rf, rpartParas)
-
-save(re45, file = "re45.RData")
-#
-#
-# # first order stability
-pmf_mat = firstClassStabilityStump(sR$data_range$names, re23$rchild)
-# best covariate
-bestCovName = colnames(pmf_mat)[which.max(pmf_mat)]
-# second order stability
-secStb = secondClassStabilityStump(nameCov=bestCovName,
-                                   isNumeric=isNumeric(bestCovName,sR$data_range), re23$rchild)
-# create and save node 3 info
-info3 = createNodeInfo(nid=3, parentNodeInfo=info_root, secStb, sR$data_range)
-save(info3, file = "info3.RData")
-
-re67 = birth(nid=3, nSim, dataRange = sR, sampleSize = list(3000),
-             secondClassStability = secStb, nodeInfo = info3,
-             samplingParameters=pcaPara, samplingMethod = "marginalRandomSampling",
-             fitedModel = mtcars_rf, rpartParas)
-
-save(re67, file = "re67.RData")
-#
+mtcars_ddt=inductionByLevel(level=3, data=X, samplingMethod=marginalRandomSampling, samplingParameters=pcaPara,
+                   stumpFun=stumps, nSim, fitedModel=mtcars_rf, sampleSize, rpartParas)
+#save(mtcars_ddt, file = "mtcars_ddt.RData")
